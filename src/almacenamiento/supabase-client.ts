@@ -31,7 +31,7 @@ export interface ClienteSupabaseMinimo {
     fn: string,
     params: Record<string, unknown>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ): Promise<{ data: any; error: { message: string } | null }>;
+  ): PromiseLike<{ data: any; error: { message: string } | null }>;
 }
 
 export function crearClienteSupabase(): ClienteSupabaseMinimo {

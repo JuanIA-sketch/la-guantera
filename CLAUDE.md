@@ -6,9 +6,12 @@ Revisa también los archivos stub en `src/` (cada uno documenta su propia respon
 y sus pendientes) y `scripts/schema.sql`.
 
 ## Estado actual
-Brief cerrado y revisado. Pendiente: modo plan de la Fase 1 (ver `docs/BRIEF.md`, sección 10).
-No programar nada todavía sin haber resuelto o preguntado por las decisiones abiertas
-de la sección 9.
+Fase 1 implementada (TDD rojo→verde, Vitest). Decisiones de la sección 9 resueltas con
+Charly en modo plan: OpenAI text-embedding-3-small (1536 dims) + gpt-4o-mini-transcribe,
+bot de Telegram dedicado, repos activos de julio, backfill de todo el historial,
+detalle híbrido de GitHub (commits + snapshot de código respetando .gitignore).
+Pendiente: validación de instalación desde cero siguiendo solo el README (la ejecuta
+Charly con claves reales, fuera de la sesión) y las decisiones #5 y #7 (Fase 2).
 
 ## No negociables (ver `docs/BRIEF.md`, sección 13)
 - `git push` y `gh repo create` SIEMPRE requieren confirmación explícita de Charly antes
