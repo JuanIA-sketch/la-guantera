@@ -6,23 +6,26 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
     "build": "tsc",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "setup": "tsx scripts/setup.ts",
+    "backfill": "tsx scripts/backfill.ts"
   },
   "dependencies": {
-    "@supabase/supabase-js": "latest",
-    "dotenv": "latest"
+    "@octokit/rest": "22.0.1",
+    "@supabase/supabase-js": "2.110.7",
+    "dotenv": "17.4.2",
+    "grammy": "1.45.0",
+    "ignore": "7.0.6",
+    "openai": "6.47.0",
+    "postgres": "3.4.9"
   },
   "devDependencies": {
-    "typescript": "latest",
-    "tsx": "latest",
-    "vitest": "latest",
-    "@types/node": "latest"
-  },
-  "_pendienteDeDecidir": [
-    "Libreria de bot de Telegram (ej. grammy o telegraf) - decision en modo plan",
-    "SDK del proveedor de embeddings elegido (ej. openai) - ver docs/BRIEF.md seccion 7.3",
-    "Fijar versiones exactas (quitar 'latest') una vez decidido el stack final en modo plan"
-  ]
+    "@types/node": "26.1.1",
+    "tsx": "4.23.1",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  }
 }
