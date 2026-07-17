@@ -1,0 +1,28 @@
+{
+  "name": "la-guantera",
+  "version": "0.1.0",
+  "description": "Memoria estructurada y consultable del ecosistema de Charly.marketing, con busqueda semantica por embeddings.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "latest",
+    "dotenv": "latest"
+  },
+  "devDependencies": {
+    "typescript": "latest",
+    "tsx": "latest",
+    "vitest": "latest",
+    "@types/node": "latest"
+  },
+  "_pendienteDeDecidir": [
+    "Libreria de bot de Telegram (ej. grammy o telegraf) - decision en modo plan",
+    "SDK del proveedor de embeddings elegido (ej. openai) - ver docs/BRIEF.md seccion 7.3",
+    "Fijar versiones exactas (quitar 'latest') una vez decidido el stack final en modo plan"
+  ]
+}
