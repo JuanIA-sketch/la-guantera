@@ -88,13 +88,13 @@ Sin ese header (o con otro valor), La Guantera responde 401 y no procesa nada.
 ### 7. Arrancar el servicio
 
 ```bash
-npm run dev      # desarrollo (recarga al guardar)
-npm start        # produccion
+npm run dev                  # desarrollo (recarga al guardar, corre TypeScript directo)
+npm run build && npm start   # produccion (compila a dist/ y corre node dist/index.js)
 ```
 
 Arranca el bot de Telegram (long polling — no necesita URL pública) y el listener HTTP interno para n8n en `127.0.0.1:3012` (configurable con `HOST_HTTP`/`PUERTO_HTTP`; en el VPS usar `HOST_HTTP=172.17.0.1`, el mismo patrón de red que los demás agentes).
 
-Para dejarlo corriendo en el VPS, el mismo patrón que los demás servicios (pm2/systemd), por ejemplo: `pm2 start npm --name la-guantera -- start`.
+Para dejarlo corriendo en el VPS, el mismo patrón que los demás servicios (pm2/systemd): `npm run build` y luego `pm2 start npm --name la-guantera --time -- start`, seguido de `pm2 save`.
 
 ## Uso
 
