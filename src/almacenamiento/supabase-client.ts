@@ -14,6 +14,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import WebSocket from 'ws';
 import type { ChunkConEmbedding, ResultadoBusqueda, SourceType } from '../tipos.js';
 
 const TABLA = 'guantera_chunks';
@@ -35,7 +36,15 @@ export interface ClienteSupabaseMinimo {
 }
 
 export function crearClienteSupabase(): ClienteSupabaseMinimo {
-  return createClient(process.env.SUPABASE_URL ?? '', process.env.SUPABASE_SERVICE_ROLE_KEY ?? '');
+  // transport explicito: supabase-js inicializa su cliente Realtime aunque no se
+  // use, y Node 20 (el del VPS) no trae WebSocket nativo — sin esto, falla al crear
+  // el cliente con "Node.js 20 detected without native WebSocket support".
+  // El cast es necesario: el tipo del constructor de `ws` difiere del WebSocket del DOM
+  // que declara supabase-js, pero en runtime Realtime solo hace `new transport(url, protocols)`,
+  // firma que `ws` soporta.
+  return createClient(process.env.SUPABASE_URL ?? '', process.env.SUPABASE_SERVICE_ROLE_KEY ?? '', {
+    realtime: { transport: WebSocket as unknown as typeof globalThis.WebSocket },
+  });
 }
 
 export interface AlmacenGuantera {
