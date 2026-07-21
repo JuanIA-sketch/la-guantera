@@ -6,6 +6,8 @@ Le preguntas al bot de Telegram en lenguaje natural ("¿dónde quedó la decisi�
 
 > Brief completo en [`docs/BRIEF.md`](./docs/BRIEF.md) — arquitectura, decisiones y fases.
 
+**Estado:** en producción desde julio 2026 — corre como servicio PM2 en el VPS, con ingesta automática de eventos de GitHub vía n8n.
+
 ## Stack
 
 TypeScript + Node.js · Supabase/pgvector (HNSW) · OpenAI `text-embedding-3-small` (embeddings) y `gpt-4o-mini-transcribe` (voz) · grammY (bot de Telegram) · n8n (reenvío de webhooks de GitHub) · Vitest
