@@ -98,6 +98,8 @@ Arranca el bot de Telegram (long polling — no necesita URL pública) y el list
 
 Para dejarlo corriendo en el VPS, el mismo patrón que los demás servicios (pm2/systemd): `npm run build` y luego `pm2 start npm --name la-guantera --time -- start`, seguido de `pm2 save`.
 
+Verificación rápida tras el despliegue: `curl http://172.17.0.1:3012/salud` debe responder `{"ok":true}`, y un POST a `/ingesta/github` sin el header `X-Guantera-Secret` debe devolver 401.
+
 ## Uso
 
 Habla con tu bot en Telegram (desde un chat_id autorizado):
