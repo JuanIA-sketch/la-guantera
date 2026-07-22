@@ -6,12 +6,23 @@ Revisa también los archivos stub en `src/` (cada uno documenta su propia respon
 y sus pendientes) y `scripts/schema.sql`.
 
 ## Estado actual
-Fase 1 implementada (TDD rojo→verde, Vitest). Decisiones de la sección 9 resueltas con
-Charly en modo plan: OpenAI text-embedding-3-small (1536 dims) + gpt-4o-mini-transcribe,
-bot de Telegram dedicado, repos activos de julio, backfill de todo el historial,
-detalle híbrido de GitHub (commits + snapshot de código respetando .gitignore).
-Pendiente: validación de instalación desde cero siguiendo solo el README (la ejecuta
-Charly con claves reales, fuera de la sesión) y las decisiones #5 y #7 (Fase 2).
+**Fase 1 completa, validada y en producción** (julio 2026). Implementada con TDD
+rojo→verde (Vitest, 94 tests), instalación validada por Charly desde cero con claves
+reales, historia de git auditada (cero secretos en todos los blobs) y repo público en
+`JuanIA-sketch/la-guantera`.
+
+Producción: VPS de Hostinger, proceso PM2 (`la-guantera`, `npm run build` + `node
+dist/index.js`), puerto 3013 expuesto solo en 172.17.0.1, workflow de n8n (GitHub
+Trigger → HTTP Request con header `X-Guantera-Secret`) conectado y probado de punta a
+punta con un commit real. Ajustes de despliegue ya commiteados: supabase-js fijado en
+2.109.0 y transport `ws` explícito, ambos por el Node 20 del VPS.
+Pendiente menor: README y `.env.example` documentan puerto 3012 — alinear con el 3013
+real al retomar.
+
+**Fase 2 pendiente de planear.** Alcance: sync periódico de n8n/Notion, API HTTP
+interna para otros agentes, e ingesta de Claude Code vía la **Memoria nativa de Motor
+Agentico 2.0** — ya NO vía El Cosechador, que no existe en esa versión (esto reemplaza
+la decisión #5 y la sección 6.3 del brief, que aún mencionan El Cosechador).
 
 ## No negociables (ver `docs/BRIEF.md`, sección 13)
 - `git push` y `gh repo create` SIEMPRE requieren confirmación explícita de Charly antes
