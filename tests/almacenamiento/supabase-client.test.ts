@@ -154,5 +154,65 @@ describe('crearAlmacen', () => {
       const almacen = crearAlmacen({ from: vi.fn(), rpc });
       await expect(almacen.buscarPorSimilitud([0.1], 5, 0.35)).rejects.toThrow('rpc no existe');
     });
+
+    test('con filtros de fuente y rango de fecha los pasa como parametros del RPC', async () => {
+      const rpc = vi.fn(async () => ({ data: [], error: null }));
+      const almacen = crearAlmacen({ from: vi.fn(), rpc });
+
+      await almacen.buscarPorSimilitud([0.5, 0.5], 5, 0.35, {
+        fuentes: ['notion', 'claude_code'],
+        desde: '2026-01-01T00:00:00Z',
+        hasta: '2026-07-01T00:00:00Z',
+      });
+
+      expect(rpc).toHaveBeenCalledWith('guantera_buscar', {
+        query_embedding: [0.5, 0.5],
+        limite: 5,
+        umbral: 0.35,
+        fuentes: ['notion', 'claude_code'],
+        desde: '2026-01-01T00:00:00Z',
+        hasta: '2026-07-01T00:00:00Z',
+      });
+    });
+
+    test('con filtros parciales solo agrega los parametros presentes', async () => {
+      const rpc = vi.fn(async () => ({ data: [], error: null }));
+      const almacen = crearAlmacen({ from: vi.fn(), rpc });
+
+      await almacen.buscarPorSimilitud([0.5], 3, 0.4, { fuentes: ['n8n'] });
+
+      expect(rpc).toHaveBeenCalledWith('guantera_buscar', {
+        query_embedding: [0.5],
+        limite: 3,
+        umbral: 0.4,
+        fuentes: ['n8n'],
+      });
+    });
+  });
+
+  describe('listarSourceIds', () => {
+    test('devuelve el set de source_id guardados para un source_type', async () => {
+      const eq = vi.fn(async () => ({
+        data: [{ source_id: 'pag-1' }, { source_id: 'pag-2' }, { source_id: 'pag-1' }],
+        error: null,
+      }));
+      const select = vi.fn(() => ({ eq }));
+      const from = vi.fn(() => ({ select }));
+      const almacen = crearAlmacen({ from, rpc: vi.fn() });
+
+      const ids = await almacen.listarSourceIds('notion');
+
+      expect(from).toHaveBeenCalledWith('guantera_chunks');
+      expect(select).toHaveBeenCalledWith('source_id');
+      expect(eq).toHaveBeenCalledWith('source_type', 'notion');
+      expect(ids).toEqual(new Set(['pag-1', 'pag-2']));
+    });
+
+    test('un error de Supabase se propaga como excepcion', async () => {
+      const eq = vi.fn(async () => ({ data: null, error: { message: 'sin permiso' } }));
+      const from = vi.fn(() => ({ select: vi.fn(() => ({ eq })) }));
+      const almacen = crearAlmacen({ from, rpc: vi.fn() });
+      await expect(almacen.listarSourceIds('notion')).rejects.toThrow('sin permiso');
+    });
   });
 });

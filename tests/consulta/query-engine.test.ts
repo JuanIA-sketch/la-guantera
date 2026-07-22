@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { consultar } from '../../src/consulta/query-engine.js';
+import { buscarResultados, consultar } from '../../src/consulta/query-engine.js';
 import type { AlmacenGuantera } from '../../src/almacenamiento/supabase-client.js';
 import type { ClienteEmbeddings } from '../../src/procesamiento/embeddings.js';
 import type { ResultadoBusqueda } from '../../src/tipos.js';
@@ -100,5 +100,48 @@ describe('consultar', () => {
     expect(respuesta.encontrado).toBe(false);
     expect(buscar).not.toHaveBeenCalled();
     expect(respuesta.mensaje).toMatch(/pregunta/i);
+  });
+
+  test('con filtros de fuente y fecha los pasa al almacen', async () => {
+    const { almacen, buscar } = almacenCon([resultado(1)]);
+    await consultar('pregunta', {
+      clienteEmbeddings,
+      almacen,
+      filtros: { fuentes: ['notion'], desde: '2026-01-01T00:00:00Z' },
+    });
+    expect(buscar).toHaveBeenCalledWith([0.1, 0.2, 0.3], 5, 0.35, {
+      fuentes: ['notion'],
+      desde: '2026-01-01T00:00:00Z',
+    });
+  });
+});
+
+describe('buscarResultados', () => {
+  test('embebe la pregunta y devuelve la lista COMPLETA de resultados del almacen', async () => {
+    const lista = [resultado(1), resultado(2), resultado(3), resultado(4), resultado(5)];
+    const { almacen, buscar } = almacenCon(lista);
+
+    const resultados = await buscarResultados('pregunta de un agente', {
+      clienteEmbeddings,
+      almacen,
+      limite: 5,
+      umbral: 0.35,
+    });
+
+    expect(buscar).toHaveBeenCalledWith([0.1, 0.2, 0.3], 5, 0.35);
+    expect(resultados).toEqual(lista);
+  });
+
+  test('pasa los filtros al almacen cuando vienen', async () => {
+    const { almacen, buscar } = almacenCon([]);
+    await buscarResultados('pregunta', {
+      clienteEmbeddings,
+      almacen,
+      filtros: { fuentes: ['claude_code'], hasta: '2026-07-01T00:00:00Z' },
+    });
+    expect(buscar).toHaveBeenCalledWith([0.1, 0.2, 0.3], 5, 0.35, {
+      fuentes: ['claude_code'],
+      hasta: '2026-07-01T00:00:00Z',
+    });
   });
 });

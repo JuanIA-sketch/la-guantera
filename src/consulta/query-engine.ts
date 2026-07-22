@@ -12,7 +12,7 @@
 
 import type { AlmacenGuantera } from '../almacenamiento/supabase-client.js';
 import { embeberTexto, type ClienteEmbeddings } from '../procesamiento/embeddings.js';
-import type { ResultadoBusqueda } from '../tipos.js';
+import type { FiltrosBusqueda, ResultadoBusqueda } from '../tipos.js';
 
 export const LIMITE_DEFAULT = 5;
 export const UMBRAL_DEFAULT = 0.35;
@@ -23,6 +23,23 @@ export interface OpcionesConsulta {
   almacen: AlmacenGuantera;
   limite?: number;
   umbral?: number;
+  filtros?: FiltrosBusqueda;
+}
+
+/**
+ * Camino compartido bot/API: pregunta → embedding → busqueda con filtros.
+ * Devuelve la lista completa de resultados; el formateo (Telegram o JSON)
+ * es responsabilidad de quien llama.
+ */
+export async function buscarResultados(
+  pregunta: string,
+  opciones: OpcionesConsulta
+): Promise<ResultadoBusqueda[]> {
+  const { clienteEmbeddings, almacen, limite = LIMITE_DEFAULT, umbral = UMBRAL_DEFAULT, filtros } = opciones;
+  const embedding = await embeberTexto(pregunta, clienteEmbeddings);
+  return filtros
+    ? almacen.buscarPorSimilitud(embedding, limite, umbral, filtros)
+    : almacen.buscarPorSimilitud(embedding, limite, umbral);
 }
 
 export interface RespuestaConsulta {
@@ -34,15 +51,12 @@ export interface RespuestaConsulta {
 }
 
 export async function consultar(pregunta: string, opciones: OpcionesConsulta): Promise<RespuestaConsulta> {
-  const { clienteEmbeddings, almacen, limite = LIMITE_DEFAULT, umbral = UMBRAL_DEFAULT } = opciones;
-
   const limpia = pregunta.trim();
   if (!limpia) {
     return { encontrado: false, mensaje: 'Mandame una pregunta y busco en la memoria.' };
   }
 
-  const embedding = await embeberTexto(limpia, clienteEmbeddings);
-  const resultados = await almacen.buscarPorSimilitud(embedding, limite, umbral);
+  const resultados = await buscarResultados(limpia, opciones);
 
   if (resultados.length === 0) {
     return {

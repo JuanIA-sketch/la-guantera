@@ -37,12 +37,21 @@ create index if not exists guantera_chunks_embedding_idx
 create index if not exists guantera_chunks_source_type_idx
   on guantera_chunks (source_type);
 
--- Busqueda semantica: top-N chunks por similitud coseno sobre el umbral dado.
+-- Busqueda semantica: top-N chunks por similitud coseno sobre el umbral dado,
+-- con filtros opcionales por fuente y rango de fecha de indexado (Fase 2).
 -- Se invoca via supabase.rpc('guantera_buscar', ...) desde src/almacenamiento/supabase-client.ts.
+-- El drop de la firma vieja de Fase 1 es necesario: agregar parametros con
+-- "create or replace" NO reemplaza la funcion — crea un overload, y las
+-- llamadas con 3 argumentos quedarian ambiguas ("function is not unique").
+drop function if exists guantera_buscar(vector, int, float);
+
 create or replace function guantera_buscar(
   query_embedding vector(1536),
   limite int default 5,
-  umbral float default 0.35
+  umbral float default 0.35,
+  fuentes text[] default null,
+  desde timestamptz default null,
+  hasta timestamptz default null
 )
 returns table (
   id uuid,
@@ -66,6 +75,9 @@ as $$
   from guantera_chunks c
   where c.embedding is not null
     and 1 - (c.embedding <=> query_embedding) >= umbral
+    and (fuentes is null or c.source_type = any (fuentes))
+    and (desde is null or c.created_at >= desde)
+    and (hasta is null or c.created_at <= hasta)
   order by c.embedding <=> query_embedding
   limit limite;
 $$;

@@ -32,4 +32,11 @@ describe('validarEnv', () => {
     const { faltantes } = validarEnv(env, ['SUPABASE_DB_URL']);
     expect(faltantes.map((f) => f.nombre)).toEqual(['SUPABASE_DB_URL']);
   });
+
+  test('GUANTERA_API_SECRET es de Fase 2: no entra en las de Fase 1 pero como extra trae su explicacion', () => {
+    expect(VARIABLES_FASE_1.map((v) => v.nombre)).not.toContain('GUANTERA_API_SECRET');
+    const { faltantes } = validarEnv(envCompleto(), ['GUANTERA_API_SECRET']);
+    expect(faltantes.map((f) => f.nombre)).toEqual(['GUANTERA_API_SECRET']);
+    expect(faltantes[0].para).toMatch(/buscar/i);
+  });
 });

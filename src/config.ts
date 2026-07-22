@@ -22,10 +22,15 @@ const TODAS: VariableEnv[] = [
   { nombre: 'GITHUB_TOKEN', para: 'PAT con permiso de LECTURA sobre los repos de GITHUB_REPOS (backfill)' },
   { nombre: 'GITHUB_WEBHOOK_SECRET', para: 'secreto compartido del header X-Guantera-Secret que manda n8n' },
   { nombre: 'GITHUB_REPOS', para: 'repos a indexar, separados por coma, formato owner/repo' },
+  // Fase 2 — el servicio la exige via extras en src/index.ts; el setup de Fase 1 no.
+  { nombre: 'GUANTERA_API_SECRET', para: 'secreto del header X-Guantera-Api-Secret con el que otros agentes consultan POST /buscar' },
 ];
 
+/** Solo se exigen via `extras` en su punto de entrada, no en todos. */
+const SOLO_EXTRAS = new Set(['SUPABASE_DB_URL', 'GUANTERA_API_SECRET']);
+
 /** Requeridas para arrancar el servicio y el backfill (SUPABASE_DB_URL es solo del setup). */
-export const VARIABLES_FASE_1: VariableEnv[] = TODAS.filter((v) => v.nombre !== 'SUPABASE_DB_URL');
+export const VARIABLES_FASE_1: VariableEnv[] = TODAS.filter((v) => !SOLO_EXTRAS.has(v.nombre));
 
 export function validarEnv(
   env: Record<string, string | undefined> = process.env,

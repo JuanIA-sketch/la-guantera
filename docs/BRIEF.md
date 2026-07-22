@@ -33,7 +33,7 @@ flowchart LR
         GH["GitHub<br/>(backfill API + webhook vía n8n)"]
         TG["Telegram manual<br/>(voz/texto)"]
         NN["n8n / Notion<br/>(sync periódico)"]
-        CC["Claude Code<br/>(vía El Cosechador)"]
+        CC["Claude Code<br/>(colector local de la Memoria<br/>de Motor Agéntico 2.0)"]
     end
 
     subgraph Pipeline["Pipeline de procesamiento"]
@@ -80,7 +80,17 @@ Vía el nodo **GitHub Trigger** de n8n (no un webhook receiver a medida): n8n ya
 Sync periódico: nodo Schedule Trigger en n8n consultando la API de n8n (para workflows/ejecuciones propias) y la API de Notion (para páginas/bases). No hay push nativo aquí, así que es polling programado, no webhook.
 
 ### 6.3 Claude Code (Fase 2)
-No existe una API oficial para leer transcripciones de sesiones de Claude Code, y su formato no está estandarizado para este fin. En vez de parsear transcripts crudos, **la Guantera consume lo que El Cosechador ya captura** (sesiones, entregables, patrones de error, historial de eficiencia) — esto evita construir un parser frágil y reutiliza una pieza que ya existe y ya funciona.
+*(Actualizado 2026-07-21 — reemplaza la versión original de esta sección.)* El Cosechador
+no existe en Motor Agéntico 2.0 (la versión instalada), así que quedó descartado como
+dependencia. En su lugar, La Guantera consume la **convención de la Memoria nativa de
+Motor Agéntico 2.0**: las memorias curadas de Claude Code en
+`~/.claude/projects/<workspace>/memory/*.md` (frontmatter `name`/`description`/`type` +
+cuerpo). Importante: NO se ingiere el `live-data.json` del aggregator del Motor — ese
+archivo va anonimizado y sin contenido completo (está pensado para el dashboard). Un
+**colector local** (`scripts/colector-claude.ts`, programado con Task Scheduler) lee los
+`.md` completos y los manda vía un webhook público de n8n al endpoint interno
+`POST /ingesta/claude-code` del VPS, con un manifiesto de memorias vigentes para borrar
+de `guantera_chunks` las que ya no existan localmente.
 
 ### 6.4 Telegram manual
 Notas sueltas por voz o texto directo al bot. Es la fuente más simple técnicamente y no depende de ninguna sincronización externa.
@@ -125,9 +135,9 @@ Estas son las que se deben resolver en modo plan o confirmar con Charly antes de
 2. **Bot de Telegram:** ¿reutilizar el bot existente que ya envía las rutinas diarias (chat_id 742163352) agregando comandos nuevos, o crear un bot dedicado solo para La Guantera? Reutilizar simplifica tokens pero mezcla propósitos. Cualquiera de las dos opciones debe cumplir el requisito de control de acceso de la sección 8.
 3. **Alcance inicial de repos en GitHub:** ¿cuáles exactamente entran en Fase 1? Recomendado: solo los activos de julio, no todo `JuanIA-sketch/*`.
 4. **Profundidad del backfill histórico (sección 6.1):** ¿se carga todo el historial de commits de cada repo elegido, o solo los últimos N meses? Todo el historial da más cobertura pero más tokens de embeddings de una sola vez.
-5. **Qué datos concretos expone El Cosechador** que se puedan indexar tal cual, sin transformación adicional (para la ingesta de Claude Code en Fase 2).
+5. ~~**Qué datos concretos expone El Cosechador**~~ — resuelta (2026-07-21): El Cosechador no existe en Motor Agéntico 2.0; la ingesta de Claude Code usa la Memoria nativa vía colector local (ver sección 6.3 actualizada).
 6. **Nivel de detalle del diff de GitHub:** ¿se indexa el mensaje de commit + archivos tocados, o el diff completo? El diff completo da más contexto pero más ruido y más tokens de embeddings.
-7. **Contenido desactualizado o eliminado en la fuente original (Fase 2+):** si un commit se revierte, o se borra una página de Notion, el chunk ya embebido en `guantera_chunks` no se actualiza solo. No bloquea Fase 1, pero conviene decidir pronto si se maneja con una fecha de "última verificación" o con un proceso de limpieza periódico, para que La Guantera no termine citando como vigente algo que ya no lo es.
+7. **Contenido desactualizado o eliminado en la fuente original (Fase 2+):** resuelta en Fase 2 (2026-07-21) para las fuentes sincronizadas por listado completo (Notion, n8n, memorias de Claude Code): cada sync omite lo que no cambió, reemplaza lo editado (`reemplazarFuente`) y borra de `guantera_chunks` lo que ya no existe en la fuente (sweep contra el listado/manifiesto vigente). Para GitHub sigue aplicando el reemplazo por archivo en cada push; los commits históricos se conservan a propósito (son historia, no estado).
 
 ## 10. Fases de desarrollo
 
@@ -149,7 +159,8 @@ Dos fases, no más — la primera cargada lo suficiente para que no se termine e
 
 ### Fase 2 — Expansión de fuentes y acceso multi-agente
 - Sync periódico de n8n (API de n8n) y Notion (API de Notion)
-- Ingesta de contexto de Claude Code vía El Cosechador
+- Ingesta de contexto de Claude Code vía la Memoria nativa de Motor Agéntico 2.0
+  (colector local — ver sección 6.3 actualizada)
 - API HTTP interna para que otros agentes del stack consulten La Guantera
 - Filtros de búsqueda por fuente y rango de fecha
 - (Opcional si da tiempo) reranking simple de resultados

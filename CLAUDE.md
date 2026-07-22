@@ -7,8 +7,8 @@ y sus pendientes) y `scripts/schema.sql`.
 
 ## Estado actual
 **Fase 1 completa, validada y en producción** (julio 2026). Implementada con TDD
-rojo→verde (Vitest, 94 tests), instalación validada por Charly desde cero con claves
-reales, historia de git auditada (cero secretos en todos los blobs) y repo público en
+rojo→verde (Vitest), instalación validada por Charly desde cero con claves reales,
+historia de git auditada (cero secretos en todos los blobs) y repo público en
 `JuanIA-sketch/la-guantera`.
 
 Producción: VPS de Hostinger, proceso PM2 (`la-guantera`, `npm run build` + `node
@@ -16,13 +16,26 @@ dist/index.js`), puerto 3013 expuesto solo en 172.17.0.1, workflow de n8n (GitHu
 Trigger → HTTP Request con header `X-Guantera-Secret`) conectado y probado de punta a
 punta con un commit real. Ajustes de despliegue ya commiteados: supabase-js fijado en
 2.109.0 y transport `ws` explícito, ambos por el Node 20 del VPS.
-Pendiente menor: README y `.env.example` documentan puerto 3012 — alinear con el 3013
-real al retomar.
 
-**Fase 2 pendiente de planear.** Alcance: sync periódico de n8n/Notion, API HTTP
-interna para otros agentes, e ingesta de Claude Code vía la **Memoria nativa de Motor
-Agentico 2.0** — ya NO vía El Cosechador, que no existe en esa versión (esto reemplaza
-la decisión #5 y la sección 6.3 del brief, que aún mencionan El Cosechador).
+**Fase 2 implementada en código (2026-07-21), pendiente de desplegar y validar.**
+TDD rojo→verde (Vitest, 145 tests). Incluye: filtros por fuente/fecha en la RPC
+`guantera_buscar` (el schema hace `drop` de la firma vieja — re-correr `npm run setup`),
+API de consulta `POST /buscar` para otros agentes (header `X-Guantera-Api-Secret`,
+nueva var `GUANTERA_API_SECRET` requerida por el servicio), sync periódico
+`POST /sync/notion` y `POST /sync/n8n` (polling en La Guantera, n8n solo hace de cron;
+503 claro si falta `NOTION_TOKEN` / `N8N_URL`+`N8N_API_KEY`), e ingesta de memorias de
+Claude Code: `scripts/colector-claude.ts` corre LOCAL (Task Scheduler) leyendo
+`~/.claude/projects/*/memory/*.md` (la convención de la Memoria nativa de Motor
+Agéntico 2.0 — NO el live-data.json del aggregator, que va anonimizado y sin contenido)
+y manda el lote vía webhook público de n8n a `POST /ingesta/claude-code` con manifiesto
+para el sweep de borrados. El Cosechador quedó descartado (no existe en Motor Agéntico
+2.0); el brief ya está actualizado (§6.3, decisiones #5 y #7).
+
+Para desplegar: `git push` (con confirmación de Charly), en el VPS `git pull` +
+`npm run setup` + agregar `GUANTERA_API_SECRET` (y opcionales de sync) al `.env` +
+reiniciar PM2, crear los 2 workflows nuevos de n8n (cron de sync y webhook del
+colector), y programar el colector en la máquina local — pasos completos en el README,
+sección "Fase 2".
 
 ## No negociables (ver `docs/BRIEF.md`, sección 13)
 - `git push` y `gh repo create` SIEMPRE requieren confirmación explícita de Charly antes

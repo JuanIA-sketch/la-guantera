@@ -15,7 +15,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import WebSocket from 'ws';
-import type { ChunkConEmbedding, ResultadoBusqueda, SourceType } from '../tipos.js';
+import type { ChunkConEmbedding, FiltrosBusqueda, ResultadoBusqueda, SourceType } from '../tipos.js';
 
 const TABLA = 'guantera_chunks';
 const CONFLICTO = 'source_type,source_id,content_hash';
@@ -55,7 +55,14 @@ export interface AlmacenGuantera {
     sourceId: string,
     chunks: ChunkConEmbedding[]
   ): Promise<{ insertados: number; duplicados: number }>;
-  buscarPorSimilitud(embedding: number[], limite: number, umbral: number): Promise<ResultadoBusqueda[]>;
+  buscarPorSimilitud(
+    embedding: number[],
+    limite: number,
+    umbral: number,
+    filtros?: FiltrosBusqueda
+  ): Promise<ResultadoBusqueda[]>;
+  /** source_id distintos ya guardados para una fuente — alimenta el sweep de borrados (Fase 2). */
+  listarSourceIds(sourceType: SourceType): Promise<Set<string>>;
 }
 
 export function crearAlmacen(cliente: ClienteSupabaseMinimo): AlmacenGuantera {
@@ -88,12 +95,17 @@ export function crearAlmacen(cliente: ClienteSupabaseMinimo): AlmacenGuantera {
       return this.insertarChunks(chunks);
     },
 
-    async buscarPorSimilitud(embedding, limite, umbral) {
-      const { data, error } = await cliente.rpc('guantera_buscar', {
+    async buscarPorSimilitud(embedding, limite, umbral, filtros) {
+      const params: Record<string, unknown> = {
         query_embedding: embedding,
         limite,
         umbral,
-      });
+      };
+      // Solo los filtros presentes: los ausentes usan el default null del RPC.
+      if (filtros?.fuentes !== undefined) params.fuentes = filtros.fuentes;
+      if (filtros?.desde !== undefined) params.desde = filtros.desde;
+      if (filtros?.hasta !== undefined) params.hasta = filtros.hasta;
+      const { data, error } = await cliente.rpc('guantera_buscar', params);
       if (error) throw new Error(`Supabase (buscar): ${error.message}`);
       return (data ?? []).map(
         (fila: {
@@ -114,6 +126,12 @@ export function crearAlmacen(cliente: ClienteSupabaseMinimo): AlmacenGuantera {
           similitud: fila.similitud,
         })
       );
+    },
+
+    async listarSourceIds(sourceType) {
+      const { data, error } = await cliente.from(TABLA).select('source_id').eq('source_type', sourceType);
+      if (error) throw new Error(`Supabase (listar fuentes): ${error.message}`);
+      return new Set((data ?? []).map((fila: { source_id: string }) => fila.source_id));
     },
   };
 }

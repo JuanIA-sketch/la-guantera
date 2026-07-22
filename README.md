@@ -1,12 +1,12 @@
 # La Guantera
 
-Memoria estructurada y consultable del ecosistema de Charly.marketing — GitHub, notas manuales por Telegram, y en Fase 2 n8n/Notion y Claude Code — con búsqueda por **significado** (embeddings), no por palabra clave.
+Memoria estructurada y consultable del ecosistema de Charly.marketing — GitHub, notas manuales por Telegram, páginas de Notion, workflows de n8n y memorias de Claude Code — con búsqueda por **significado** (embeddings), no por palabra clave.
 
 Le preguntas al bot de Telegram en lenguaje natural ("¿dónde quedó la decisión del índice HNSW?") y responde con el **contenido exacto** del fragmento más relevante + su fuente citada (commit, archivo, nota). Nunca un resumen.
 
 > Brief completo en [`docs/BRIEF.md`](./docs/BRIEF.md) — arquitectura, decisiones y fases.
 
-**Estado:** en producción desde julio 2026 — corre como servicio PM2 en el VPS, con ingesta automática de eventos de GitHub vía n8n.
+**Estado:** en producción desde julio 2026 — corre como servicio PM2 en el VPS, con ingesta automática de eventos de GitHub vía n8n. Fase 2 (sync de Notion/n8n, memorias de Claude Code y API para otros agentes) implementada — ver la sección Fase 2.
 
 ## Stack
 
@@ -82,7 +82,7 @@ Es re-ejecutable: una segunda corrida no paga embeddings ni duplica nada que no 
 En n8n, crea un workflow con dos nodos:
 
 1. **GitHub Trigger** — eventos `push`, `pull_request`, `issues` de los mismos repos de `GITHUB_REPOS` (requiere permisos de owner/admin para registrar el webhook).
-2. **HTTP Request** — método `POST`, URL `http://172.17.0.1:3012/ingesta/github` (el host/puerto donde corre La Guantera), body = JSON del evento (`{{ $json.body }}` según cómo entregue tu versión del nodo), y un header:
+2. **HTTP Request** — método `POST`, URL `http://172.17.0.1:3013/ingesta/github` (el host/puerto donde corre La Guantera), body = JSON del evento (`{{ $json.body }}` según cómo entregue tu versión del nodo), y un header:
    - `X-Guantera-Secret`: el mismo valor de `GITHUB_WEBHOOK_SECRET` de tu `.env`.
 
 Sin ese header (o con otro valor), La Guantera responde 401 y no procesa nada.
@@ -94,11 +94,11 @@ npm run dev                  # desarrollo (recarga al guardar, corre TypeScript 
 npm run build && npm start   # produccion (compila a dist/ y corre node dist/index.js)
 ```
 
-Arranca el bot de Telegram (long polling — no necesita URL pública) y el listener HTTP interno para n8n en `127.0.0.1:3012` (configurable con `HOST_HTTP`/`PUERTO_HTTP`; en el VPS usar `HOST_HTTP=172.17.0.1`, el mismo patrón de red que los demás agentes).
+Arranca el bot de Telegram (long polling — no necesita URL pública) y el listener HTTP interno para n8n en `127.0.0.1:3013` (configurable con `HOST_HTTP`/`PUERTO_HTTP`; en el VPS usar `HOST_HTTP=172.17.0.1`, el mismo patrón de red que los demás agentes).
 
 Para dejarlo corriendo en el VPS, el mismo patrón que los demás servicios (pm2/systemd): `npm run build` y luego `pm2 start npm --name la-guantera --time -- start`, seguido de `pm2 save`.
 
-Verificación rápida tras el despliegue: `curl http://172.17.0.1:3012/salud` debe responder `{"ok":true}`, y un POST a `/ingesta/github` sin el header `X-Guantera-Secret` debe devolver 401.
+Verificación rápida tras el despliegue: `curl http://172.17.0.1:3013/salud` debe responder `{"ok":true}`, y un POST a `/ingesta/github` sin el header `X-Guantera-Secret` debe devolver 401.
 
 ## Uso
 
@@ -107,7 +107,7 @@ Habla con tu bot en Telegram (desde un chat_id autorizado):
 - **Pregunta en texto libre**: `¿dónde quedó la decisión del índice HNSW?` → responde con el contenido exacto más relevante + fuente citada + hasta 2 fuentes alternativas.
 - **Pregunta por voz**: mándale un audio — lo transcribe y busca igual.
 - **/nota `<texto>`**: guarda una nota manual en la memoria.
-- **Nota por voz**: audio que empiece con la palabra "nota" (ej. *"nota: el puerto de la guantera es 3012"*).
+- **Nota por voz**: audio que empiece con la palabra "nota" (ej. *"nota: el puerto de la guantera es 3013"*).
 - **/start**: ayuda breve.
 
 Todo lo que entra (notas, commits, archivos) pasa antes por un **chequeo de secretos**: si algo parece una credencial, se rechaza completo y el bot te avisa sin repetir el contenido.
@@ -124,16 +124,69 @@ Suite de Vitest cubriendo cada módulo: chequeo de secretos, chunking, embedding
 
 ```
 src/
-├── ingesta/          github.ts (backfill + eventos de n8n), telegram-manual.ts
+├── ingesta/          github.ts, telegram-manual.ts, notion-n8n.ts, claude-code.ts
 ├── procesamiento/    chequeo-secretos.ts, chunking.ts, embeddings.ts
 ├── almacenamiento/   supabase-client.ts (guantera_chunks + RPC guantera_buscar)
-├── consulta/         query-engine.ts, telegram-bot.ts, api.ts (Fase 2)
+├── consulta/         query-engine.ts, telegram-bot.ts, api.ts (POST /buscar)
 ├── pipeline.ts       secretos → chunking → embeddings → Supabase
 ├── config.ts         validación de entorno
 └── index.ts          bot + listener HTTP
-scripts/              schema.sql, setup.ts, backfill.ts
+scripts/              schema.sql, setup.ts, backfill.ts, demo.ts, colector-claude.ts
 ```
 
-## Fase 2 (pendiente)
+## Fase 2 — más fuentes y acceso multi-agente
 
-Sync periódico de n8n/Notion, ingesta de Claude Code vía El Cosechador, API HTTP interna para otros agentes del stack, filtros por fuente y fecha. Ver `docs/BRIEF.md`, sección 10.
+Todo corre dentro del mismo servicio y puerto (3013). Los pasos de esta sección son
+opcionales e independientes entre sí: cada fuente que no configures simplemente responde
+503 con un mensaje que dice qué variable falta.
+
+> Si vienes de Fase 1: vuelve a correr `npm run setup` (actualiza la función
+> `guantera_buscar` con filtros por fuente y fecha) y agrega `GUANTERA_API_SECRET`
+> a tu `.env` antes de reiniciar el servicio.
+
+### API de consulta para otros agentes (`POST /buscar`)
+
+Cualquier agente del stack puede consultar La Guantera por HTTP dentro del VPS,
+autenticándose con el header `X-Guantera-Api-Secret` (variable `GUANTERA_API_SECRET`,
+distinta del secreto de ingesta):
+
+```bash
+curl -s http://172.17.0.1:3013/buscar \
+  -H 'content-type: application/json' \
+  -H 'x-guantera-api-secret: <GUANTERA_API_SECRET>' \
+  -d '{
+    "pregunta": "¿dónde quedó la decisión del índice HNSW?",
+    "fuentes": ["github", "notion"],
+    "desde": "2026-06-01T00:00:00Z",
+    "limite": 5
+  }'
+```
+
+Respuesta: `{ "encontrado": true, "resultados": [{ "contenido", "sourceType", "sourceId", "sourceUrl", "metadata", "similitud" }] }` — contenido exacto + fuente citada, igual que el bot. `fuentes`, `desde`, `hasta`, `limite` y `umbral` son opcionales.
+
+### Sync periódico de Notion y n8n
+
+1. **Notion**: crea una integración interna en [notion.so/my-integrations](https://www.notion.so/my-integrations), copia el token a `NOTION_TOKEN`, y comparte con la integración las páginas que quieras indexar (ese es todo el control de alcance).
+2. **n8n**: crea una API key (Settings → API) y llena `N8N_URL` (raíz de tu instancia) y `N8N_API_KEY`. Se indexa la definición de cada workflow (nombre, estado, etiquetas, nodos), no las ejecuciones.
+3. En n8n, crea un workflow con un **Schedule Trigger** (diario está bien) y dos nodos **HTTP Request** en serie: `POST http://172.17.0.1:3013/sync/notion` y `POST http://172.17.0.1:3013/sync/n8n`, ambos con el header `X-Guantera-Secret` = `GITHUB_WEBHOOK_SECRET`.
+
+Cada corrida es un listado completo de la fuente: la primera trae todo lo que ya existe, las siguientes omiten lo que no cambió (sin pagar embeddings), reemplazan lo editado y borran de la memoria lo que ya no existe en la fuente. La respuesta lo resume: `{ "procesados", "omitidos", "rechazados", "borrados" }`.
+
+### Ingesta de memorias de Claude Code (colector local)
+
+Las memorias nativas de Claude Code (`~/.claude/projects/<workspace>/memory/*.md`, las
+mismas que muestra el grafo de Memoria de Motor Agéntico 2.0) se recolectan en tu máquina
+local y viajan al VPS vía n8n:
+
+1. En n8n, crea un workflow con un nodo **Webhook** (método POST, path `guantera-claude`) y un **HTTP Request** que reenvíe el body tal cual a `POST http://172.17.0.1:3013/ingesta/claude-code`, conservando el header `X-Guantera-Secret` (o agregándolo con el valor de `GITHUB_WEBHOOK_SECRET`).
+2. En tu máquina local, clona este repo, `npm install`, y en el `.env` llena solo `GUANTERA_WEBHOOK_URL` (la URL pública del webhook del paso 1) y `GUANTERA_WEBHOOK_SECRET` (el mismo secreto).
+3. Pruébalo una vez a mano: `npx tsx scripts/colector-claude.ts` — imprime cuántas memorias encontró y el resumen del servidor.
+4. Prográmalo diario con el Task Scheduler de Windows (PowerShell):
+
+```powershell
+schtasks /create /tn "GuanteraColectorClaude" /sc daily /st 07:30 `
+  /tr "cmd /c cd /d C:\ruta\a\la-guantera && npx tsx scripts\colector-claude.ts"
+```
+
+El colector manda el contenido completo de cada memoria más un manifiesto de las
+vigentes: las memorias que borres localmente se borran también de `guantera_chunks`.

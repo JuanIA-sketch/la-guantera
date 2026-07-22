@@ -9,6 +9,15 @@
 
 export type SourceType = 'github' | 'notion' | 'n8n' | 'telegram_manual' | 'claude_code';
 
+/** Lista runtime de SourceType — para validar entrada externa (API, colector). */
+export const SOURCE_TYPES: readonly SourceType[] = [
+  'github',
+  'notion',
+  'n8n',
+  'telegram_manual',
+  'claude_code',
+];
+
 /** Contenido de una fuente, tal cual, antes de chunking. */
 export interface DocumentoCrudo {
   sourceType: SourceType;
@@ -40,6 +49,14 @@ export interface Chunk {
 /** Chunk ya embebido, listo para insertar en guantera_chunks. */
 export interface ChunkConEmbedding extends Chunk {
   embedding: number[];
+}
+
+/** Filtros opcionales de busqueda (Fase 2): por fuente y rango de fecha de indexado. */
+export interface FiltrosBusqueda {
+  fuentes?: SourceType[];
+  /** ISO 8601 — filtra por created_at del chunk. */
+  desde?: string;
+  hasta?: string;
 }
 
 /** Resultado de una busqueda semantica en guantera_chunks. */

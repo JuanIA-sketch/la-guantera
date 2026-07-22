@@ -74,8 +74,9 @@ function crearAlmacenEnMemoria(): AlmacenGuantera & { filas: ChunkConEmbedding[]
       }
       return this.insertarChunks(chunks);
     },
-    async buscarPorSimilitud(embedding, limite, umbral) {
+    async buscarPorSimilitud(embedding, limite, umbral, filtros) {
       return filas
+        .filter((fila) => !filtros?.fuentes || filtros.fuentes.includes(fila.sourceType))
         .map((fila): ResultadoBusqueda => ({
           id: fila.contentHash.slice(0, 8),
           contenido: fila.contenido,
@@ -88,6 +89,9 @@ function crearAlmacenEnMemoria(): AlmacenGuantera & { filas: ChunkConEmbedding[]
         .filter((r) => r.similitud >= umbral)
         .sort((a, b) => b.similitud - a.similitud)
         .slice(0, limite);
+    },
+    async listarSourceIds(sourceType) {
+      return new Set(filas.filter((f) => f.sourceType === sourceType).map((f) => f.sourceId));
     },
   };
 }
@@ -223,8 +227,11 @@ async function main(): Promise<void> {
 
   // ---------- 6. listener HTTP para n8n ----------
   titulo('6. Listener HTTP (payload reenviado por n8n)');
+  const { manejarBusqueda } = await import('../src/consulta/api.js');
+  const { manejarLoteClaudeCode } = await import('../src/ingesta/claude-code.js');
   const servidor = crearServidorHttp({
     secretoWebhook: 'secreto-demo',
+    secretoApi: 'secreto-api-demo',
     manejarEventoGitHub: async (payload) => {
       const r = await procesarDocumentos(
         (await import('../src/ingesta/github.js')).transformarPayloadGitHub(payload),
@@ -232,6 +239,8 @@ async function main(): Promise<void> {
       );
       return { documentos: r.length, rechazados: r.filter((x) => !x.aceptado).length };
     },
+    manejarBusqueda: (cuerpo) => manejarBusqueda(cuerpo, { clienteEmbeddings, almacen }),
+    manejarLoteClaudeCode: (cuerpo) => manejarLoteClaudeCode(cuerpo, pipeline),
   });
   await new Promise<void>((resolve) => servidor.listen(0, '127.0.0.1', resolve));
   const puerto = (servidor.address() as AddressInfo).port;
@@ -254,6 +263,35 @@ async function main(): Promise<void> {
     body: JSON.stringify(push),
   });
   console.log(`POST con secreto correcto → ${conSecretoHttp.status} ${JSON.stringify(await conSecretoHttp.json())}`);
+
+  // ---------- 7. API de consulta para otros agentes (Fase 2) ----------
+  titulo('7. API interna POST /buscar (otros agentes del stack)');
+  const buscarSinSecreto = await fetch(`${base}/buscar`, {
+    method: 'POST',
+    body: JSON.stringify({ pregunta: 'x' }),
+  });
+  console.log(`POST /buscar sin header de secreto de API → ${buscarSinSecreto.status}`);
+
+  const buscarConSecreto = await fetch(`${base}/buscar`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-guantera-api-secret': 'secreto-api-demo' },
+    body: JSON.stringify({
+      pregunta: 'donde quedo la decision del indice HNSW?',
+      fuentes: ['github'],
+      limite: 2,
+      umbral: UMBRAL_DEMO,
+    }),
+  });
+  const cuerpoBusqueda = (await buscarConSecreto.json()) as {
+    resultados: { contenido: string; sourceUrl?: string; similitud: number }[];
+  };
+  console.log(
+    `POST /buscar con secreto y filtro fuentes=[github] → ${buscarConSecreto.status}, ` +
+      `${cuerpoBusqueda.resultados.length} resultados; el mejor:`
+  );
+  const mejor = cuerpoBusqueda.resultados[0];
+  console.log(`  "${mejor.contenido.slice(0, 80)}..." (${mejor.sourceUrl})`);
+
   await new Promise((resolve) => servidor.close(resolve));
 
   titulo('Demo completa');
