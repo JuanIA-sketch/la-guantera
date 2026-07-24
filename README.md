@@ -168,7 +168,7 @@ Respuesta: `{ "encontrado": true, "resultados": [{ "contenido", "sourceType", "s
 
 1. **Notion**: crea una integración interna en [notion.so/my-integrations](https://www.notion.so/my-integrations), copia el token a `NOTION_TOKEN`, y comparte con la integración las páginas que quieras indexar (ese es todo el control de alcance).
 2. **n8n**: crea una API key (Settings → API) y llena `N8N_URL` (raíz de tu instancia) y `N8N_API_KEY`. Se indexa la definición de cada workflow (nombre, estado, etiquetas, nodos), no las ejecuciones.
-3. En n8n, crea un workflow con un **Schedule Trigger** (diario está bien) y dos nodos **HTTP Request** en serie: `POST http://172.17.0.1:3013/sync/notion` y `POST http://172.17.0.1:3013/sync/n8n`, ambos con el header `X-Guantera-Secret` = `GITHUB_WEBHOOK_SECRET`.
+3. En n8n, crea un workflow con un **Schedule Trigger** (diario está bien) y dos nodos **HTTP Request** en paralelo (ambos colgando del trigger, con "On Error: Continue"): `POST http://172.17.0.1:3013/sync/notion` y `POST http://172.17.0.1:3013/sync/n8n`, ambos con el header `X-Guantera-Secret` = `GITHUB_WEBHOOK_SECRET`. En paralelo y con continue-on-error para que un 503 de una fuente sin configurar no bloquee a la otra.
 
 Cada corrida es un listado completo de la fuente: la primera trae todo lo que ya existe, las siguientes omiten lo que no cambió (sin pagar embeddings), reemplazan lo editado y borran de la memoria lo que ya no existe en la fuente. La respuesta lo resume: `{ "procesados", "omitidos", "rechazados", "borrados" }`.
 
@@ -181,11 +181,18 @@ local y viajan al VPS vía n8n:
 1. En n8n, crea un workflow con un nodo **Webhook** (método POST, path `guantera-claude`) y un **HTTP Request** que reenvíe el body tal cual a `POST http://172.17.0.1:3013/ingesta/claude-code`, conservando el header `X-Guantera-Secret` (o agregándolo con el valor de `GITHUB_WEBHOOK_SECRET`).
 2. En tu máquina local, clona este repo, `npm install`, y en el `.env` llena solo `GUANTERA_WEBHOOK_URL` (la URL pública del webhook del paso 1) y `GUANTERA_WEBHOOK_SECRET` (el mismo secreto).
 3. Pruébalo una vez a mano: `npx tsx scripts/colector-claude.ts` — imprime cuántas memorias encontró y el resumen del servidor.
-4. Prográmalo diario con el Task Scheduler de Windows (PowerShell):
+4. Prográmalo diario con el Task Scheduler de Windows. Un `.cmd` intermedio aguanta
+   rutas con espacios y deja log acumulado:
+
+```bat
+:: %USERPROFILE%\.la-guantera\colector-task.cmd
+@echo off
+cd /d "C:\ruta\a\la-guantera"
+npx tsx scripts\colector-claude.ts >> "%USERPROFILE%\.la-guantera\colector.log" 2>&1
+```
 
 ```powershell
-schtasks /create /tn "GuanteraColectorClaude" /sc daily /st 07:30 `
-  /tr "cmd /c cd /d C:\ruta\a\la-guantera && npx tsx scripts\colector-claude.ts"
+schtasks /create /tn "GuanteraColectorClaude" /sc daily /st 07:30 /tr "%USERPROFILE%\.la-guantera\colector-task.cmd"
 ```
 
 El colector manda el contenido completo de cada memoria más un manifiesto de las
