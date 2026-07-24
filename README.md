@@ -25,6 +25,9 @@ TypeScript + Node.js · Supabase/pgvector (HNSW) · OpenAI `text-embedding-3-sma
 
 Los pasos van en orden. Si algo falla, el mensaje de error dice qué falta.
 
+> ¿No sabes de dónde sale alguna clave? [`docs/INSTALACION-CLAVES.md`](./docs/INSTALACION-CLAVES.md)
+> documenta dónde se consigue cada una hoy, con los tropiezos reales del proyecto marcados.
+
 ### 1. Clonar e instalar dependencias
 
 ```bash
